@@ -48,25 +48,23 @@ int main() {
 
     for (int i = 0; i < headerSize;) {
       // read line bt line
-      char* startOfLine = headerStart + i;
-      char* endOfLine = strstr(startOfLine + 1, "\n");
-      size_t lineLength = endOfLine - startOfLine;
+      char* lineStart = headerStart + i;
+      char* lineEnd = strstr(lineStart + 1, "\n");
+      int lineOffset = lineEnd - lineStart;
 
-      char line[lineLength];
+      char* contentStart = lineStart + 1; // ignore leading \n
+      char* contentEnd = strstr(lineStart, "\r"); // ignore everything after \r
+      int contentLength = contentEnd - contentStart;
 
-      char* actualEnd = (strstr(startOfLine + 1, "\r"));
+      char* line = malloc(contentLength);
+      strncpy(line, contentStart, contentLength);
 
-      int end = actualEnd - startOfLine;
+      printf("line: %s\n", line);
 
-      strncpy(line, startOfLine + 1, end); // + 1 and -1 are to remove leading and trailing line breaks
-    
-      printf("\n\nline: %s\n", line);
-      
       char* delimiter = strstr(line, ":");
-      char* valLimit = strstr(delimiter + 2, "\r");
       char val[200];
       memset(val, '\0', 200);
-      strncpy(val, delimiter + 2, valLimit - delimiter - 2);
+      strcpy(val, delimiter + 2);
 
       char key[200];
       memset(key, '\0', 200);
@@ -83,7 +81,10 @@ int main() {
       printf("json key: %s\n", jsonKey);
       printf("json val: %s\n", jsonValue);
 
-      i += lineLength;
+      memset(line, '\0', contentLength);
+      free(line);
+
+      i += lineOffset;
     }
 
     strcat(jsonResponse, " }");
