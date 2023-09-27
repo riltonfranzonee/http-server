@@ -33,18 +33,18 @@ int main() {
     char* buffer = (char*) malloc(BUFFER_SIZE);
     memset(buffer, '\0', BUFFER_SIZE);
 
-    int messageSize = recv(incomingSocketId, buffer, BUFFER_SIZE, 0);
+    ssize_t messageSize = recv(incomingSocketId, buffer, BUFFER_SIZE, 0);
 
     char* headerStart = strstr(buffer, "\n");
     char* headerEnd = strstr(buffer, "\r\n\r\n");
 
-    int headerSize = headerEnd - headerStart;
+    ssize_t headerSize = headerEnd - headerStart;
 
-    printf("just received a message! size: %d\n", headerSize);
+    printf("just received a message! size: %lu\n", headerSize);
 
     char* jsonResponse = (char*) malloc(BUFFER_SIZE);
 
-    strcat(jsonResponse, "{ ");
+    strcat(jsonResponse, "{\n");
 
     for (int i = 0; i < headerSize;) {
       // read line by line
@@ -59,15 +59,19 @@ int main() {
       char* line = malloc(contentLength);
       strncpy(line, contentStart, contentLength);
 
-      printf("line: %s\n", line);
-
       char* key = strtok(line, ": ");
-      char* value = strtok(NULL, ": ");
+      char* value = strtok(NULL, " ");
+      char* keyValuePair;
 
-      char* keyValuePair = (char*) malloc(strlen(key) + strlen(value) + 7);
-      sprintf(keyValuePair, "\"%s\": \"%s\"", key, value);
+      if(i == 0) {
+        keyValuePair = (char*) malloc(strlen(key) + strlen(value) + 7);
+        sprintf(keyValuePair, "\"%s\": \"%s\"", key, value);
+      } else {
+        keyValuePair = (char*) malloc(strlen(key) + strlen(value) + 9);
+        sprintf(keyValuePair, ",\n\"%s\": \"%s\"", key, value);
+      }
 
-      printf("key value pair: %s\n", keyValuePair);
+      strcat(jsonResponse, keyValuePair);     
 
       memset(line, '\0', contentLength);
       memset(keyValuePair, '\0', contentLength);
@@ -77,12 +81,20 @@ int main() {
       i += lineOffset;
     }
 
-    strcat(jsonResponse, " }");
+    strcat(jsonResponse, "\n}");
 
-    char str[] = "hello";
+    int responseSize = strlen(jsonResponse);
 
-    send(incomingSocketId, (void*)str, 5, 0);
+    char* responseHeader = malloc(BUFFER_SIZE);
 
+    sprintf(responseHeader, "HTTP/1.1 200 OK\nContent-Length: %d\nContent-Type: application/json\nConnection: close\r\n\r\n", responseSize);
+
+    send(incomingSocketId, (void*)responseHeader, strlen(responseHeader), 0);
+    send(incomingSocketId, (void*)jsonResponse, responseSize, 0);
+
+    memset(jsonResponse, '\0', responseSize);
+    free(jsonResponse);
+    free(responseHeader);
     free(buffer);
     close(incomingSocketId);
   }
