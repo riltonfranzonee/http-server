@@ -7,7 +7,7 @@
 
 #define MAX_PENDING_CONNECTIONS 10
 #define PORT 8888
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 4096
 
 int main() {
   int socketId = socket(PF_INET, SOCK_STREAM, 0);
@@ -29,9 +29,8 @@ int main() {
 
   while(1) {
     int incomingSocketId = accept(socketId, (struct sockaddr*) &client, &clientlen);
-
-    char* buffer = (char*) malloc(BUFFER_SIZE);
-    memset(buffer, '\0', BUFFER_SIZE);
+    
+    char buffer[BUFFER_SIZE];
 
     ssize_t messageSize = recv(incomingSocketId, buffer, BUFFER_SIZE, 0);
 
@@ -42,10 +41,10 @@ int main() {
 
     printf("just received a message! size: %lu\n", headerSize);
 
-    char* jsonResponse = (char*) malloc(BUFFER_SIZE);
+    char* jsonResponse = (char*) malloc(headerSize * 2);
 
     strcat(jsonResponse, "{\n");
-
+    
     for (int i = 0; i < headerSize;) {
       // read line by line
       char* lineStart = headerStart + i;
@@ -61,41 +60,30 @@ int main() {
 
       char* key = strtok(line, ": ");
       char* value = strtok(NULL, " ");
-      char* keyValuePair;
+      char keyValuePair[1000];
 
       if(i == 0) {
-        keyValuePair = (char*) malloc(strlen(key) + strlen(value) + 7);
         sprintf(keyValuePair, "\"%s\": \"%s\"", key, value);
       } else {
-        keyValuePair = (char*) malloc(strlen(key) + strlen(value) + 9);
         sprintf(keyValuePair, ",\n\"%s\": \"%s\"", key, value);
       }
 
       strcat(jsonResponse, keyValuePair);     
 
       memset(line, '\0', contentLength);
-      memset(keyValuePair, '\0', contentLength);
       free(line);
-      free(keyValuePair);
 
       i += lineOffset;
     }
 
     strcat(jsonResponse, "\n}");
 
-    int responseSize = strlen(jsonResponse);
+    char* resHeader = "HTTP/1.1 200 OK\r\nContent-Type: text/json\r\n\r\n";
 
-    char* responseHeader = malloc(BUFFER_SIZE);
+    send(incomingSocketId, resHeader, strlen(resHeader), 0);
+    send(incomingSocketId, jsonResponse, strlen(jsonResponse), 0);
 
-    sprintf(responseHeader, "HTTP/1.1 200 OK\nContent-Length: %d\nContent-Type: application/json\nConnection: close\r\n\r\n", responseSize);
-
-    send(incomingSocketId, (void*)responseHeader, strlen(responseHeader), 0);
-    send(incomingSocketId, (void*)jsonResponse, responseSize, 0);
-
-    memset(jsonResponse, '\0', responseSize);
     free(jsonResponse);
-    free(responseHeader);
-    free(buffer);
     close(incomingSocketId);
   }
 
