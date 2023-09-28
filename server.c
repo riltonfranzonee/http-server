@@ -10,7 +10,7 @@
 #define BUFFER_SIZE 4096
 
 // converts a string of "key: value" lines into a JSON object
-char* to_json(char* key_value_lines, ssize_t string_size) {
+char* key_value_lines_to_json(char* key_value_lines, ssize_t string_size) {
   char* jsonResponse = (char*) malloc(string_size * 2);
   strcpy(jsonResponse, ""); // initialize it as an empty string
 
@@ -72,7 +72,8 @@ int main() {
 
   while(1) {
     int client_socket = accept(socketId, (struct sockaddr*) &client, &clientlen);
-    
+    printf("received connection (%s:%d)\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+
     char buffer[BUFFER_SIZE];
 
     recv(client_socket, buffer, BUFFER_SIZE, 0);
@@ -81,9 +82,9 @@ int main() {
     char* header_end = strstr(buffer, "\r\n\r\n");
     ssize_t header_size = header_end - header_start;
 
-    char* headers_as_json = to_json(header_start, header_size);
+    char* headers_as_json = key_value_lines_to_json(header_start, header_size);
 
-    char* response_header = "HTTP/1.1 200 OK\r\nContent-Type: text/json\r\n\r\n";
+    char* response_header = "HTTP/1.1 200 OK\r\n\r\n";
 
     send(client_socket, response_header, strlen(response_header), 0);
     send(client_socket, headers_as_json, strlen(headers_as_json), 0);
