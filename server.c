@@ -30,7 +30,7 @@ char* to_json(char* key_value_lines, ssize_t string_size) {
 
     char* key = strtok(line, ": ");
     char* value = strtok(NULL, " ");
-    char key_value_pair[1000];
+    char* key_value_pair = (char*) malloc(strlen(key) + strlen(value) + 9);
 
     if(offset == 0) {
       sprintf(key_value_pair, "\"%s\": \"%s\"", key, value);
@@ -40,7 +40,9 @@ char* to_json(char* key_value_lines, ssize_t string_size) {
 
     strcat(jsonResponse, key_value_pair);
     memset(line, '\0', content_length);
+    memset(key_value_pair, '\0', strlen(key_value_pair));
     free(line);
+    free(key_value_pair);
 
     offset += line_offset;
   }
