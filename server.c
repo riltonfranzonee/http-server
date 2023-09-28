@@ -9,6 +9,47 @@
 #define PORT 8888
 #define BUFFER_SIZE 4096
 
+// converts a string of "key: value\n" lines into a JSON object
+char* to_json(char* key_value_lines, ssize_t string_size) {
+  char* jsonResponse = (char*) malloc(string_size * 2);
+  strcpy(jsonResponse, ""); // initialize it as an empty string
+
+  strcat(jsonResponse, "{\n");
+  
+  for (int offset = 0; offset < string_size;) {
+    char* line_start = key_value_lines + offset;
+    char* line_end = strstr(line_start + 1, "\n");
+    int line_offset = line_end - line_start;
+
+    char* content_start = line_start + 1; // ignore leading \n
+    char* content_end = strstr(line_start, "\r"); // ignore everything after \r
+    int content_length = content_end - content_start;
+
+    char* line = (char*) malloc(content_length);
+    strncpy(line, content_start, content_length);
+
+    char* key = strtok(line, ": ");
+    char* value = strtok(NULL, " ");
+    char key_value_pair[1000];
+
+    if(offset == 0) {
+      sprintf(key_value_pair, "\"%s\": \"%s\"", key, value);
+    } else {
+      sprintf(key_value_pair, ",\n\"%s\": \"%s\"", key, value);
+    }
+
+    strcat(jsonResponse, key_value_pair);
+    memset(line, '\0', content_length);
+    free(line);
+
+    offset += line_offset;
+  }
+
+  strcat(jsonResponse, "\n}");
+
+  return jsonResponse;
+}
+
 int main() {
   int socketId = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -28,63 +69,25 @@ int main() {
   printf("server listening on %d\n", PORT);
 
   while(1) {
-    int incomingSocketId = accept(socketId, (struct sockaddr*) &client, &clientlen);
+    int client_socket = accept(socketId, (struct sockaddr*) &client, &clientlen);
     
     char buffer[BUFFER_SIZE];
 
-    ssize_t messageSize = recv(incomingSocketId, buffer, BUFFER_SIZE, 0);
+    recv(client_socket, buffer, BUFFER_SIZE, 0);
 
-    char* headerStart = strstr(buffer, "\n");
-    char* headerEnd = strstr(buffer, "\r\n\r\n");
+    char* header_start = strstr(buffer, "\n");
+    char* header_end = strstr(buffer, "\r\n\r\n");
+    ssize_t header_size = header_end - header_start;
 
-    ssize_t headerSize = headerEnd - headerStart;
+    char* headers_as_json = to_json(header_start, header_size);
 
-    printf("just received a message! size: %lu\n", headerSize);
+    char* response_header = "HTTP/1.1 200 OK\r\nContent-Type: text/json\r\n\r\n";
 
-    char* jsonResponse = (char*) malloc(headerSize * 2);
+    send(client_socket, response_header, strlen(response_header), 0);
+    send(client_socket, headers_as_json, strlen(headers_as_json), 0);
 
-    strcat(jsonResponse, "{\n");
-    
-    for (int i = 0; i < headerSize;) {
-      // read line by line
-      char* lineStart = headerStart + i;
-      char* lineEnd = strstr(lineStart + 1, "\n");
-      int lineOffset = lineEnd - lineStart;
-
-      char* contentStart = lineStart + 1; // ignore leading \n
-      char* contentEnd = strstr(lineStart, "\r"); // ignore everything after \r
-      int contentLength = contentEnd - contentStart;
-
-      char* line = malloc(contentLength);
-      strncpy(line, contentStart, contentLength);
-
-      char* key = strtok(line, ": ");
-      char* value = strtok(NULL, " ");
-      char keyValuePair[1000];
-
-      if(i == 0) {
-        sprintf(keyValuePair, "\"%s\": \"%s\"", key, value);
-      } else {
-        sprintf(keyValuePair, ",\n\"%s\": \"%s\"", key, value);
-      }
-
-      strcat(jsonResponse, keyValuePair);     
-
-      memset(line, '\0', contentLength);
-      free(line);
-
-      i += lineOffset;
-    }
-
-    strcat(jsonResponse, "\n}");
-
-    char* resHeader = "HTTP/1.1 200 OK\r\nContent-Type: text/json\r\n\r\n";
-
-    send(incomingSocketId, resHeader, strlen(resHeader), 0);
-    send(incomingSocketId, jsonResponse, strlen(jsonResponse), 0);
-
-    free(jsonResponse);
-    close(incomingSocketId);
+    free(headers_as_json);
+    close(client_socket);
   }
 
   return 0;
