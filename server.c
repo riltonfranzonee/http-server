@@ -9,7 +9,7 @@
 #define PORT 8888
 #define BUFFER_SIZE 4096
 
-// converts a string of "key: value\n" lines into a JSON object
+// converts a string of "key: value" lines into a JSON object
 char* to_json(char* key_value_lines, ssize_t string_size) {
   char* jsonResponse = (char*) malloc(string_size * 2);
   strcpy(jsonResponse, ""); // initialize it as an empty string
